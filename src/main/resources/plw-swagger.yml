@@ -1,0 +1,249 @@
+openapi: 3.0.1
+info:
+  title: Passive Liveness Service
+  version: 1.0.0
+paths:
+  /api/v1/health:
+    get:
+      tags:
+        - Actuator
+      operationId: getHealth
+      responses:
+        "200":
+          description: getHealth 200 response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HealthResult'
+  /api/v1/health/{selector}:
+    get:
+      tags:
+        - Actuator
+      operationId: getHealth_1
+      parameters:
+        - name: selector
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/HealthCheckType'
+      responses:
+        "200":
+          description: getHealth_1 200 response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HealthResult'
+  /api/v1/info:
+    get:
+      tags:
+        - Actuator
+      operationId: getInfo
+      responses:
+        "200":
+          description: getInfo 200 response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+  /api/v1/liveness/passive/evaluation:
+    post:
+      tags:
+        - Liveness
+      summary: Evaluate passive liveness
+      operationId: evaluatePassiveLiveness
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PassiveLivenessEvaluationRequest'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassiveLivenessEvaluationResponse'
+        "400":
+          description: |-
+            Bad request
+
+            Possible error codes:
+             - INVALID_IMAGE
+             - INVALID_REQUEST_BODY
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "500":
+          description: |-
+            Internal Server Error
+
+            Possible error codes:
+             - UNEXPECTED_ERROR
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+        - BearerAuthorization: []
+components:
+  schemas:
+    Error:
+      type: string
+      enum:
+        - NO_FACE_DETECTED
+    ErrorCode:
+      type: string
+      enum:
+        - NOT_FOUND
+        - INTERNAL_SERVER_ERROR
+        - UNAUTHORIZED
+        - METHOD_NOT_ALLOWED
+        - INVALID_IMAGE
+        - BAD_REQUEST
+    ErrorResponse:
+      required:
+        - errorCode
+        - errorMessage
+      type: object
+      properties:
+        errorCode:
+          allOf:
+            - $ref: '#/components/schemas/ErrorCode'
+            - description: Error code
+              readOnly: true
+        errorMessage:
+          type: string
+          description: Error detailed description. It's only informative.
+          readOnly: true
+      description: Error response
+      readOnly: true
+    HealthCheckType:
+      type: string
+      enum:
+        - LIVENESS
+        - READINESS
+    HealthResult:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        details: {}
+    HealthStatus:
+      required:
+        - description
+        - name
+        - operational
+        - severity
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        operational:
+          type: boolean
+          nullable: true
+        severity:
+          type: integer
+          format: int32
+          nullable: true
+    PassiveLivenessEvaluationRequest:
+      required:
+        - selfie
+      type: object
+      properties:
+        selfie:
+          allOf:
+            - $ref: '#/components/schemas/PassiveLivenessEvaluationRequest.SelfieDTO'
+            - readOnly: false
+      writeOnly: true
+    PassiveLivenessEvaluationRequest.ImageDTO:
+      required:
+        - data
+      type: object
+      properties:
+        data:
+          minItems: 1
+          type: string
+          description: The data bytes as Base64 encoded string.
+          readOnly: false
+          writeOnly: true
+      description: Image provided as Base64 encoded string.
+      writeOnly: true
+    PassiveLivenessEvaluationRequest.SelfieDTO:
+      required:
+        - image
+      type: object
+      properties:
+        image:
+          allOf:
+            - $ref: '#/components/schemas/PassiveLivenessEvaluationRequest.ImageDTO'
+            - readOnly: false
+      writeOnly: true
+    PassiveLivenessEvaluationResponse:
+      type: object
+      properties:
+        score:
+          maximum: 1
+          minimum: 0
+          type: number
+          description: The liveness score.
+          format: float
+          readOnly: true
+          example: 0.8
+        errors:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/PassiveLivenessEvaluationResponse.PassiveLivenessErrors'
+            - readOnly: true
+        warnings:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/PassiveLivenessEvaluationResponse.PassiveLivenessWarnings'
+            - readOnly: true
+      description: Response.
+      readOnly: true
+    PassiveLivenessEvaluationResponse.PassiveLivenessErrors:
+      required:
+        - selfie
+      type: object
+      properties:
+        selfie:
+          type: array
+          description: The error
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/Error'
+      readOnly: true
+    PassiveLivenessEvaluationResponse.PassiveLivenessWarnings:
+      required:
+        - selfie
+      type: object
+      properties:
+        selfie:
+          type: array
+          description: The warnings
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/Warning'
+      readOnly: true
+    Warning:
+      type: string
+      enum:
+        - MULTIPLE_FACES_DETECTED
+        - LOW_QUALITY
+  securitySchemes:
+    BearerAuthorization:
+      type: http
+      scheme: bearer
